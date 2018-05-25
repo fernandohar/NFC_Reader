@@ -4,14 +4,16 @@
 //OLED Driver from: https://github.com/greiman/SSD1306Ascii
 //PN532 Driver from: https://github.com/elechouse/PN532
 //
+#include <Wire.h>
+
 #include "SSD1306Ascii.h"
-#include "SSD1306AsciiAvrI2c.h"
+#include "SSD1306AsciiWire.h"
 
 // 0X3C+SA0 - 0x3C or 0x3D
 #define I2C_ADDRESS 0x3C
 
 
-#include <Wire.h>
+
 #include <PN532_I2C.h>
 #include <PN532.h>
 #include <NfcAdapter.h>
@@ -20,7 +22,7 @@
 // Define proper RST_PIN if required.
 #define RST_PIN -1
 
-SSD1306AsciiAvrI2c oled;
+SSD1306AsciiWire oled;
 
 PN532_I2C pn532_i2c(Wire);
 NfcAdapter nfc = NfcAdapter(pn532_i2c);
