@@ -3,6 +3,7 @@
 
 //OLED Driver from: https://github.com/greiman/SSD1306Ascii
 //PN532 Driver from: https://github.com/elechouse/PN532
+//BLE based on BLE_server example Based on Neil Kolban example for IDF: https://github.com/nkolban/esp32-snippets/blob/master/cpp_utils/tests/BLE%20Tests/SampleServer.cpp
 //
 #include <Wire.h>
 
@@ -22,31 +23,28 @@
 // Define proper RST_PIN if required.
 #define RST_PIN -1
 
+#include <BLEDevice.h>
+#include <BLEUtils.h>
+#include <BLEServer.h>
+
+//Variables for OLED
 SSD1306AsciiWire oled;
 
+//Variables for NFC
 PN532_I2C pn532_i2c(Wire);
 NfcAdapter nfc = NfcAdapter(pn532_i2c);
-
-
 unsigned long previousMillis = 0;
 bool nfcDetected = false;
 
-void scanNFC(){
-  unsigned long currentMillis = millis();
-  if(!nfcDetected && (currentMillis - previousMillis) >= 3000 ){
-    oled.clear();
-    oled.set2X();
-    oled.print("Scanning ");
-    previousMillis = currentMillis;
-    scanNFCHelper();
-  }else if ((currentMillis - previousMillis) >= 2000 ){
-    oled.clear();
-    oled.set2X();
-    oled.print("Scanning ");
-    previousMillis = currentMillis;
-    scanNFCHelper();
-  }
-}
+//Variables for BLE Server
+// See the following for generating UUIDs:
+// https://www.uuidgenerator.net/
+#define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
+#define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
+BLEServer *pServer;
+BLEService *pService; 
+BLECharacteristic *pCharacteristic;
+BLEAdvertising *pAdvertising;
 void scanNFCHelper(){
   nfcDetected = nfc.tagPresent();
   if (nfcDetected){
@@ -84,11 +82,29 @@ void scanNFCHelper(){
               payloadAsString += (char)payload[c];
             }
              oled.print(payloadAsString);
+             pCharacteristic->setValue(payload, payloadLength);
          }
       }
+  }else{
+    pCharacteristic->setValue("");
   }
 }
-
+void scanNFC(){
+  unsigned long currentMillis = millis();
+  if(!nfcDetected && (currentMillis - previousMillis) >= 3000 ){ //No card detected, wait for 3 seconds and re scan
+    oled.clear();
+    oled.set2X();
+    oled.print("Scanning ");
+    previousMillis = currentMillis;
+    scanNFCHelper();
+  }else if ((currentMillis - previousMillis) >= 2000 ){
+    oled.clear();
+    oled.set2X();
+    oled.print("Scanning ");
+    previousMillis = currentMillis;
+    scanNFCHelper();
+  }
+}
 //------------------------------------------------------------------------------
 void setup() {
   nfc.begin();
@@ -104,8 +120,24 @@ void setup() {
   //uint32_t m = micros();
   oled.clear();
   oled.set2X();
-  oled.println("NFC Tester"); 
+  oled.println("Ble-NFC Reader"); 
   oled.set1X();
+  oled.println("BLE Device: \nBleNFCReader");
+  BLEDevice::init("BleNFCReader");
+  pServer = BLEDevice::createServer();
+  pService = pServer->createService(SERVICE_UUID);
+  pCharacteristic = pService->createCharacteristic(
+                                         CHARACTERISTIC_UUID,
+                                         BLECharacteristic::PROPERTY_READ |
+                                         BLECharacteristic::PROPERTY_WRITE
+                                       );
+
+  pCharacteristic->setValue("");
+  pService->start();
+  pAdvertising = pServer->getAdvertising();
+  pAdvertising->start();
+  
+  delay(1000);
 }
 //------------------------------------------------------------------------------
 void loop() {
